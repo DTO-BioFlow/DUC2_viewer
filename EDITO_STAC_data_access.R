@@ -1,15 +1,15 @@
-install.packages("rstac")
-install.packages("mregions2")
+#install.packages("rstac")
+#install.packages("mregions2")
 library(rstac)
 library(purrr)
 library(arrow)
 library(dplyr)
 library(leaflet)
-library(mregions2)
 
 
 # PLAN --------------------------------------------------------------------
 
+# etn data -> done
 # marine spatial plan
 # seabed habitats
 # shipwrecks -> to georeference, check with Sam!
@@ -21,57 +21,250 @@ library(mregions2)
 
 stac_endpoint_url <- 'https://catalog.dive.edito.eu/'
 api_endpoint_url <- "https://api.dive.edito.eu/data/collections/"
-stac_obj <- stac(stac_endpoint_url)
+stac_obj <- rstac::stac(stac_endpoint_url)
 
-stac_overview <- stac('https://catalog.dive.edito.eu/catalogs')%>%get_request()
+stac_overview <- rstac::stac('https://catalog.dive.edito.eu/catalogs')%>% rstac::get_request()
 
 # collections
-col_obj <- collections(stac_obj) %>%
-  get_request()
+c_obj <- rstac::collections(stac_obj) %>%
+  rstac::get_request()
 
 c_all <- col_obj$collections |> vapply(`[[`, character(1), "id") %>% as_tibble()
 
 
 # 2. get OWF layers -------------------------------------------------------
 
+c_owf_list <- c_all %>% dplyr::filter(grepl("wind", c_all$value))
+c_owf_selection <- c_owf_list$value[10]
 
-OWF_col <- stac_obj %>%
-  collections(c_owf_selection)%>%
-  get_request()
+c_owf_list <- c_all %>% dplyr::filter(grepl("wind", c_all$value))
+c_owf_selection <- c("emodnet-wind_farm_power_mw")
 
 owf_items <- stac_obj %>%
-  stac_search(collections = c_owf_selection, limit = 500) %>%
-  get_request() %>%
-  items_fetch()
-
-# reading parquet does not work!
-owf_link_parquet_href <- owf_items$features[[1]]$assets$parquet$href
-owf <- arrow::read_parquet(owf_link_parquet_href, format = "parquet")
+  rstac::stac_search(collections = c_owf_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
 
 # wms
-owf_link_wms_href <- owf_items$features[[1]]$assets$wms$href
-
-wms_base <- "https://ows.emodnet-humanactivities.eu/wms" #TODO: make programmatically
-wms_base_owf <- sub("\\?.*$", "", owf_link_wms_href)
-layer_name_owf <- "windfarmspoly" #TODO: make programmatically
+owf_wms_link <- owf_items$features[[1]]$assets$wms$href
+owf_wms_base <- sub("\\?.*$", "", owf_wms_link)
+owf_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", owf_wms_link)
 
 
-# legend
-
-legend_url <- paste0(
-  wms_base,
+## legend
+owf_legend_url <- paste0(
+  owf_wms_base,
   "?SERVICE=WMS&REQUEST=GetLegendGraphic",
   "&FORMAT=image/png",
-  "&LAYER=", layer_name_owf,
+  "&LAYER=", owf_layer_name,
   "&VERSION=1.1.1"
 )
 
-legend_url
-browseURL(legend_url)   # opens the legend image in your browser
+owf_items <- stac_obj %>%
+  rstac::stac_search(collections = c_owf_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
+
+# wms
+owf_wms_link <- owf_items$features[[1]]$assets$wms$href
+owf_wms_base <- sub("\\?.*$", "", owf_wms_link)
+owf_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", owf_wms_link)
 
 
+## legend
+owf_legend_url <- paste0(
+  owf_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", owf_layer_name,
+  "&VERSION=1.1.1"
+)
+
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = owf_wms_base,
+#     layers  = owf_layer_name,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">Wind farms</div>',
+#       '<img src="', owf_legend_url, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   ) 
 
 
+# ETN dataset "PhD_Gossens" -----------------------------------------------
+
+dataset_name <- "PhD_Goossens"
+
+## etn data collection in EDITO STAC catalogue
+etn_items <- stac_obj %>%
+  rstac::stac_search(collections = "animal_tracking_datasets") %>%
+  rstac::get_request()%>%
+  rstac::items_fetch()
+
+# Loop through the features and check if dataset_name is included in the title
+for (feature in etn_items$features) {
+  # Extract the title and href for the feature's asset
+  title <- feature$assets$data$title
+  href <- feature$assets$data$href
+  
+  # If the dataset_name is found in the title, extract the href
+  if (grepl(dataset_name, title, fixed = TRUE)) {
+    etn_dataset_href <- href
+    break
+  }
+}
+
+# Print the matching href
+print(etn_dataset_href)
+
+etn_dataset <- arrow::read_parquet(etn_dataset_href, format = "parquet")
+
+
+# marine spatial plan -----------------------------------------------------
+
+c_msp_list <- c_all %>% dplyr::filter(grepl("spatial_planning", c_all$value))
+c_msp_selection <- c_msp_list$value[1]
+
+msp_items <- stac_obj %>%
+  rstac::stac_search(collections = c_msp_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
+
+# wms
+msp_wms_link <- msp_items$features[[3]]$assets$wms$href
+msp_wms_base <- sub("\\?.*$", "", msp_wms_link)
+msp_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", msp_wms_link)
+
+
+## legend
+msp_legend_url <- paste0(
+  msp_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", msp_layer_name,
+  "&VERSION=1.1.1"
+)
+
+browseURL(msp_legend_url)
+
+# test map
+leaflet() %>%
+  setView(3, 51.5, zoom = 8) %>%
+  addTiles() %>%
+  addWMSTiles(
+    baseUrl = msp_wms_base,
+    layers  = msp_layer_name,
+    options = WMSTileOptions(
+      format = "image/png",
+      transparent = T,
+      opacity = 1
+    )) %>%
+  addControl(
+    html = paste0(
+      '<div style="background:white;padding:6px;border-radius:4px;">',
+      '<div style="font-weight:600;margin-bottom:4px;">Spatial Planning Areas</div>',
+      '<img src="', msp_legend_url, '" />',
+      '</div>'
+    ),position = "bottomright"
+  )
+
+# Natura2000 areas -----------------------------------------------------
+
+c_natura2000_list <- c_all %>% dplyr::filter(grepl("protected_areas", c_all$value))
+c_natura2000_selection <- c_natura2000_list$value[1]
+
+natura2000_items <- stac_obj %>%
+  rstac::stac_search(collections = c_natura2000_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
+
+# wms
+natura2000_wms_link <- natura2000_items$features[[4]]$assets$wms$href
+natura2000_wms_base <- sub("\\?.*$", "", natura2000_wms_link)
+natura2000_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", natura2000_wms_link)
+
+
+## legend
+natura2000_legend_url <- paste0(
+  natura2000_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", natura2000_layer_name,
+  "&VERSION=1.1.1"
+)
+
+browseURL(natura2000_legend_url)
+
+# test map
+leaflet() %>%
+  setView(3, 51.5, zoom = 8) %>%
+  addTiles() %>%
+  addWMSTiles(
+    baseUrl = natura2000_wms_base,
+    layers  = natura2000_layer_name,
+    options = WMSTileOptions(
+      format = "image/png",
+      transparent = T,
+      opacity = 1
+    )) %>%
+  addControl(
+    html = paste0(
+      '<div style="background:white;padding:6px;border-radius:4px;">',
+      '<div style="font-weight:600;margin-bottom:4px;">Natura2000 Areas</div>',
+      '<img src="', natura2000_legend_url, '" />',
+      '</div>'
+    ),position = "bottomright"
+  )
+
+# international sea conventions -------------------------------------------
+
+sea_conventions_wms_link <- natura2000_items$features[[3]]$assets$wms$href
+sea_conventions_wms_base <- sub("\\?.*$", "", sea_conventions_wms_link)
+sea_conventions_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", sea_conventions_wms_link)
+
+
+## legend
+sea_conventions_legend_url <- paste0(
+  sea_conventions_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", sea_conventions_layer_name,
+  "&VERSION=1.1.1"
+)
+
+browseURL(sea_conventions_legend_url)
+
+# test map
+leaflet() %>%
+  setView(3, 51.5, zoom = 8) %>%
+  addTiles() %>%
+  addWMSTiles(
+    baseUrl = sea_conventions_wms_base,
+    layers  = sea_conventions_layer_name,
+    options = WMSTileOptions(
+      format = "image/png",
+      transparent = T,
+      opacity = 1
+    )) %>%
+  addControl(
+    html = paste0(
+      '<div style="background:white;padding:6px;border-radius:4px;">',
+      '<div style="font-weight:600;margin-bottom:4px;">sea_conventions Areas</div>',
+      '<img src="', sea_conventions_legend_url, '" />',
+      '</div>'
+    ),position = "bottomright"
+  )
 
 # OLD below here ----------------------------------------------------------
 
@@ -120,10 +313,6 @@ owf_items <- stac_obj %>%
   stac_search(collections = c_owf_selection, limit = 500) %>%
   get_request() %>%
   items_fetch()
-
-# reading parquet does not work!
-owf_link_parquet_href <- owf_items$features[[1]]$assets$parquet$href
-owf <- arrow::read_parquet(owf_link_parquet_href, format = "parquet")
 
 # wms
 owf_link_wms_href <- owf_items$features[[1]]$assets$wms$href
