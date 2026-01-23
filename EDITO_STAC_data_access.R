@@ -96,7 +96,7 @@ legend_url <- paste0(
   wms_base,
   "?SERVICE=WMS&REQUEST=GetLegendGraphic",
   "&FORMAT=image/png",
-  "&LAYER=", layer_name,
+  "&LAYER=", layer_name_owf,
   "&VERSION=1.1.1"
 )
 
@@ -185,6 +185,16 @@ leaflet() %>%
 
 library(leaflet)
 library(magrittr)
+
+leaflet() %>%
+  addTiles() %>%
+  addWMSTiles(
+    baseUrl = wms_base_owf,
+    layers  = layer_name_owf,
+    options = WMSTileOptions(
+      format = "image/png",
+      transparent = TRUE
+    ))
 
 m <- leaflet() %>%
   # --- Base map (background) ---
