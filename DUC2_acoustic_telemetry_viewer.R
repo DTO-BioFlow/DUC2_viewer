@@ -1,36 +1,104 @@
 library(shiny)
 library(DT)
-library(sass)
-library(yaml)
-library(memoise)
+library(leaflet)
+#library(sass)
+#library(yaml)
+#library(memoise)
 library(glue)
 
-blue_light <- "#bfd7f0"
-blue_medium <- "#3b5d82"
+blue_light <- "#cde3f6" #"#b3d9f7"
+blue_medium <- "#477292"
+blue_dark <- "#11395a"
 
 ui <- fluidPage(
   
-  # shade the top tabs
   tags$head(
     tags$style(HTML(glue::glue("
-      .top-tabs > .tabbable > .nav-tabs {{
-        background-color: {blue_light} !important;
-        padding: 6px 6px 0 6px;
-        border-radius: 6px;
-      }}
+    /* Make the header area (tabs + logo) a flex row */
+    .top-tabs {{
+      position: relative;
+    }}
+
+    /* The UL that holds the tabs */
+    .top-tabs > .tabbable > .nav-tabs {{
+      background-color: {blue_light} !important;
+      padding: 6px 6px 0 6px;
+      border-radius: 6px;
+
+      display: flex;
+      align-items: center;
+      padding-right: 70px; /* space so the logo doesn't overlap tabs */
+    }}
+
+    /* The logo link positioned at the right edge of the tab strip */
+    .top-tabs .top-tabs-logo {{
+      position: absolute;
+      right: 25px;
+      top: 10px;
+      z-index: 10;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+    }}
+
+    .top-tabs .top-tabs-logo img {{
+      display: block;
+    }}
+    
+    /* Style for the tab content (panels) and tabs in the lower-level sections */
+    .lower-level-tabs > .tabbable > .nav-tabs {{
+      background-color: {blue_dark} !important;
+      color: white !important;
+      padding: 6px 6px 0 6px;
+      border-radius: 6px;
+    }}
+      
+     /* Set the text color of the tab titles in the lower-level tabs */
+      .lower-level-tabs .tabbable > .nav-tabs > li > a {{
+      color: white !important;}}
+      
+      /* Set the text color of the active tab to blue_dark */
+      .lower-level-tabs .tabbable > .nav-tabs > li.active > a {{
+        color: {blue_dark} !important;}}
   ")))
   ),
   
+  # # shade the top tabs
+  # tags$head(
+  #   tags$style(HTML(glue::glue("
+  #     .top-tabs > .tabbable > .nav-tabs {{
+  #       background-color: {blue_light} !important;
+  #       padding: 6px 6px 0 6px;
+  #       border-radius: 6px;
+  #     }}
+  # ")))
+  # ),
+  
   titlePanel("DUC2: Impact from offshore infrastructures on marine life"),
-  mainPanel(
+  mainPanel(width = 12,
     tags$div(                 
       class = "top-tabs container-fluid",
+      
+      # RIGHT-SIDE LOGO (clickable)
+      tags$a(
+        href = "https://dto-bioflow.eu/",
+        target = "_blank",
+        rel = "noopener",
+        class = "top-tabs-logo",
+        tags$img(
+          src = "Logo_BIO-Flow2023_Final_Positive.png",
+          height = "42px",
+          alt = "DTO-Bioflow"
+        )
+      ),
+      
       tabsetPanel(
         id = "tabsetPanelID",
         type = "tabs",
         
         tabPanel(
-          "Home",
+          width = 12,
+          "Home", style = "font-size: 16px;",
           fluidRow(
             column(
               width = 12,
@@ -71,30 +139,36 @@ ui <- fluidPage(
         ),
         
         tabPanel(
+          width = 12,
           title = tagList(
             tags$img(
               src = "D_labrax_phylopic_CC0.png",
               height = "24px",
               style = "vertical-align:middle; margin-right:8px;"
             ),
-            tags$span("European seabass", style = "font-size: 12px; vertical-align:middle;")
+            tags$span("European seabass", style = "font-size: 16px; vertical-align:middle;")
           ),
+          class = "lower-level-tabs",
           tabsetPanel(
-            tabPanel("Migration predictions", DTOutput("seabass_migration")),
-            tabPanel("acoustic telemetry data", DTOutput("acoustic_telemetry")),
+            tabPanel("Migration predictions", 
+                     leafletOutput("seabass_migration_map", height = 700)),
+            tabPanel("acoustic telemetry data",
+                     leafletOutput("seabass_data_map", height = 700), 
+                     DTOutput("acoustic_telemetry")),
             tabPanel("Environmental layers", DTOutput("env_layers"))
           )
         ),
         
-        tabPanel(
+        tabPanel(width = 12,
           title = tagList(
             tags$img(
               src = "P_phocoena_phylopic_CC0.png",
               height = "24px",
               style = "vertical-align:middle; margin-right:8px;"
             ),
-            tags$span("Harbour porpoise", style = "font-size: 12px; vertical-align:middle;")
+            tags$span("Harbour porpoise", style = "font-size: 16px; vertical-align:middle;")
           ),
+          class = "lower-level-tabs",
           tabsetPanel(
             tabPanel("PAM dashboard", DTOutput("PAM_dashboard")),
             tabPanel("PAM data", DTOutput("PAM_data")),
@@ -107,9 +181,27 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  output$PAM_dashboard <- renderDT(iris)
+  
+  # leaflet maps
+  ## model prediction map
+  output$seabass_migration_map <- renderLeaflet({
+    leaflet() |>
+      addProviderTiles(providers$Esri.OceanBasemap) |>
+      setView(lng = 2.5, lat = 51.2, zoom = 6) |>
+      addMarkers(lng = 2.5, lat = 51.2, popup = "Example point")
+  })
+  
+  ## raw acoustic telemetry data map
+  output$seabass_data_map <- renderLeaflet({
+    leaflet() |>
+      addTiles() |>
+      setView(lng = 2.5, lat = 51.2, zoom = 6) |>
+      addMarkers(lng = 2.5, lat = 51.2, popup = "Example point2!")
+  })
+  
+  output$PAM_dashboard <- renderDT(cars)
   output$PAM_data <- renderDT(cars)
-  output$HSM_porpoise <- renderDT(head(iris, 3))
+  output$HSM_porpoise <- renderDT(head(cars, 3))
 }
 
 shinyApp(ui, server)

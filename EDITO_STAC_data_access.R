@@ -17,7 +17,7 @@ library(mregions2)
 # EEZ -> doesn't load
 # MSFD and Natura2000 boundaries
 
-# acces the STAC catalogue and get collections ----------------------------
+# 1. access the STAC catalogue and get collections ----------------------------
 
 stac_endpoint_url <- 'https://catalog.dive.edito.eu/'
 api_endpoint_url <- "https://api.dive.edito.eu/data/collections/"
@@ -31,6 +31,49 @@ col_obj <- collections(stac_obj) %>%
 
 c_all <- col_obj$collections |> vapply(`[[`, character(1), "id") %>% as_tibble()
 
+
+# 2. get OWF layers -------------------------------------------------------
+
+
+OWF_col <- stac_obj %>%
+  collections(c_owf_selection)%>%
+  get_request()
+
+owf_items <- stac_obj %>%
+  stac_search(collections = c_owf_selection, limit = 500) %>%
+  get_request() %>%
+  items_fetch()
+
+# reading parquet does not work!
+owf_link_parquet_href <- owf_items$features[[1]]$assets$parquet$href
+owf <- arrow::read_parquet(owf_link_parquet_href, format = "parquet")
+
+# wms
+owf_link_wms_href <- owf_items$features[[1]]$assets$wms$href
+
+wms_base <- "https://ows.emodnet-humanactivities.eu/wms" #TODO: make programmatically
+wms_base_owf <- sub("\\?.*$", "", owf_link_wms_href)
+layer_name_owf <- "windfarmspoly" #TODO: make programmatically
+
+
+# legend
+
+legend_url <- paste0(
+  wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", layer_name_owf,
+  "&VERSION=1.1.1"
+)
+
+legend_url
+browseURL(legend_url)   # opens the legend image in your browser
+
+
+
+
+
+# OLD below here ----------------------------------------------------------
 
 
 # get all relevant collections--------------------------------------------
