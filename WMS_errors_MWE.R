@@ -20,11 +20,15 @@ leaflet::leaflet() %>%
 
 
 leaflet::leaflet() %>% 
-  setView(3, 51.5, zoom = 8) %>%
   addTiles() %>%
+  setView(3, 51.5, zoom = 8) %>%
   addWMSTiles(
     baseUrl = "https://geo.vliz.be/geoserver/Kustportaal/wms",
-    layers = "Kustportaal:scheepswrakken_20180604"
+    layers = "Kustportaal:scheepswrakken_20180604",
+    options = WMSTileOptions(
+      format = "image/png",
+      transparent = T
+    )
   )
 
 

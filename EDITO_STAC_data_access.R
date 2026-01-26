@@ -10,12 +10,22 @@ library(leaflet)
 # PLAN --------------------------------------------------------------------
 
 # etn data -> done
-# marine spatial plan
+# marine spatial plan -> DONE
 # seabed habitats
 # shipwrecks -> to georeference, check with Sam!
 # OWF -> DONE
 # EEZ -> doesn't load
-# MSFD and Natura2000 boundaries
+# MSFD and Natura2000 boundaries -> DONE
+
+
+# 0. make return df -------------------------------------------------------
+
+wms_registry <- tibble(env_data_name = character(), 
+                             collection_name = character(),  
+                             wms_link = character(), 
+                             wms_base = character(),
+                             wms_layer_name = character(),
+                             legend_link = character())
 
 # 1. access the STAC catalogue and get collections ----------------------------
 
@@ -29,7 +39,7 @@ stac_overview <- rstac::stac('https://catalog.dive.edito.eu/catalogs')%>% rstac:
 c_obj <- rstac::collections(stac_obj) %>%
   rstac::get_request()
 
-c_all <- col_obj$collections |> vapply(`[[`, character(1), "id") %>% as_tibble()
+c_all <- c_obj$collections |> vapply(`[[`, character(1), "id") %>% as_tibble()
 
 
 # 2. get OWF layers -------------------------------------------------------
@@ -101,6 +111,17 @@ owf_legend_url <- paste0(
 #     ),position = "bottomright"
 #   ) 
 
+## appending row to wms_registry
+
+wms_registry <- add_row(
+  wms_registry,
+  env_data_name = "owf",
+  collection_name = c_owf_selection,
+  wms_link    = owf_wms_link,
+  wms_base    = owf_wms_base,
+  wms_layer_name  = owf_layer_name,
+  legend_link = owf_legend_url) %>%
+  distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE)
 
 # ETN dataset "PhD_Gossens" -----------------------------------------------
 
@@ -206,26 +227,26 @@ natura2000_legend_url <- paste0(
 
 browseURL(natura2000_legend_url)
 
-# test map
-leaflet() %>%
-  setView(3, 51.5, zoom = 8) %>%
-  addTiles() %>%
-  addWMSTiles(
-    baseUrl = natura2000_wms_base,
-    layers  = natura2000_layer_name,
-    options = WMSTileOptions(
-      format = "image/png",
-      transparent = T,
-      opacity = 1
-    )) %>%
-  addControl(
-    html = paste0(
-      '<div style="background:white;padding:6px;border-radius:4px;">',
-      '<div style="font-weight:600;margin-bottom:4px;">Natura2000 Areas</div>',
-      '<img src="', natura2000_legend_url, '" />',
-      '</div>'
-    ),position = "bottomright"
-  )
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = natura2000_wms_base,
+#     layers  = natura2000_layer_name,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">Natura2000 Areas</div>',
+#       '<img src="', natura2000_legend_url, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   )
 
 # international sea conventions -------------------------------------------
 
@@ -245,13 +266,65 @@ sea_conventions_legend_url <- paste0(
 
 browseURL(sea_conventions_legend_url)
 
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = sea_conventions_wms_base,
+#     layers  = sea_conventions_layer_name,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">sea_conventions Areas</div>',
+#       '<img src="', sea_conventions_legend_url, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   )
+
+# bathymetry --------------------------------------------------------------
+
+c_bathy_list <- c_all %>% dplyr::filter(grepl("elevation", c_all$value))
+c_bathy_selection <- c_bathy_list$value[1]
+
+bathy_objects <- stac_obj %>%
+  rstac::collections(c_bathy_selection)%>%
+  rstac::get_request()
+
+bathy_items <- stac_obj %>%
+  rstac::stac_search(collections = c_bathy_selection) %>%
+  rstac::get_request()%>%
+  rstac::items_fetch()
+
+bathy_wms_link <- bathy_items$features[[8]]$assets$wms$href
+bathy_wms_base <- sub("\\?.*$", "", bathy_wms_link)
+bathy_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", bathy_wms_link)
+bathy_layer_name <- "mean_atlas_land"
+bathy_layer_name <- "emodnet:mean_multicolour"
+
+## legend
+bathy_legend_url <- paste0(
+  bathy_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", bathy_layer_name,
+  "&VERSION=1.1.1"
+)
+
+browseURL(bathy_legend_url)
+
 # test map
 leaflet() %>%
   setView(3, 51.5, zoom = 8) %>%
   addTiles() %>%
   addWMSTiles(
-    baseUrl = sea_conventions_wms_base,
-    layers  = sea_conventions_layer_name,
+    baseUrl = bathy_wms_base,
+    layers  = bathy_layer_name,
     options = WMSTileOptions(
       format = "image/png",
       transparent = T,
@@ -260,11 +333,108 @@ leaflet() %>%
   addControl(
     html = paste0(
       '<div style="background:white;padding:6px;border-radius:4px;">',
-      '<div style="font-weight:600;margin-bottom:4px;">sea_conventions Areas</div>',
-      '<img src="', sea_conventions_legend_url, '" />',
+      '<div style="font-weight:600;margin-bottom:4px;">Bathymetry</div>',
+      '<img src="', bathy_legend_url, '" />',
       '</div>'
     ),position = "bottomright"
   )
+
+# seabedhabitats -doesnt work -----------------------------------------------------
+
+c_seabedhabitats_list <- c_all %>% dplyr::filter(grepl("habitat", c_all$value))
+c_seabedhabitats_selection <- c_seabedhabitats_list$value[42] 
+c_seabedhabitats_selection
+#12 # should be the layer
+# 4 shows sth
+# 5 # gives complete legend: "https://ows.emodnet-seabedhabitats.eu/geoserver/emodnet_view/wms?SERVICE=WMS&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=eunismaps_all&VERSION=1.1.1"
+# 13 shows something but not BPNS
+# 15, 16, 23 only baltic
+# 22 IRL
+# 24 # emodnet-modelled_projections_of_habitat_for_commercial_fish_around_north_western_europe_under_climate_change_2020_to_2060
+# 27 seagrass cover (EOV)
+
+seabedhabitats_items <- stac_obj %>%
+  rstac::stac_search(collections = c_seabedhabitats_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
+
+
+# wms
+seabedhabitats_wms_link <- seabedhabitats_items$features[[1]]$assets$wms$href
+seabedhabitats_wms_link
+browseURL(seabedhabitats_wms_link)
+seabedhabitats_wms_base <- sub("\\?.*$", "", seabedhabitats_wms_link)
+seabedhabitats_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", seabedhabitats_wms_link)
+
+# parquet
+seabedhabitats_parquet_link <- seabedhabitats_items$features[[1]]$assets$parquet$href
+seabedhabitats_parquet <- arrow::read_parquet(seabedhabitats_parquet_link, format = "parquet")
+# 
+# library(sf)
+# #library(dplyr)
+# geom_test <- st_as_sfc(as.list(seabedhabitats_parquet$geometry[1:5]), crs = 4326)
+# st_bbox(geom_test)
+# 
+# library(DBI)
+# library(duckdb)
+# 
+# con <- dbConnect(duckdb())
+# 
+# dbExecute(con, "INSTALL spatial;")
+# dbExecute(con, "LOAD spatial;")
+# 
+# sql <- "
+# SELECT *
+# FROM read_parquet($1)
+# WHERE ST_Intersects(
+#   geometry,
+#   ST_MakeEnvelope(2, 50, 6, 52)
+# )
+# "
+# 
+# subset_df <- dbGetQuery(con, sql, params = list(seabedhabitats_parquet_link))
+# subset_df <- dbGetQuery(con, sql, params = list(seabedhabitats_parquet_link))
+# 
+# dbDisconnect(con, shutdown = TRUE)
+# 
+
+
+#library(sf)
+#seabedhabitats_p_sf <- sf::st_as_sf(seabedhabitats_parquet)
+
+
+## legend
+seabedhabitats_legend_url <- paste0(
+  seabedhabitats_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", seabedhabitats_layer_name,
+  "&VERSION=1.1.1"
+)
+
+browseURL(seabedhabitats_legend_url)
+
+# test map
+leaflet() %>%
+  setView(3, 51.5, zoom = 8) %>%
+  addTiles() %>%
+  addWMSTiles(
+    baseUrl = seabedhabitats_wms_base,
+    layers  = seabedhabitats_layer_name,
+    options = WMSTileOptions(
+      format = "image/png",
+      transparent = T,
+      opacity = 1
+    )) %>%
+  addControl(
+    html = paste0(
+      '<div style="background:white;padding:6px;border-radius:4px;">',
+      '<div style="font-weight:600;margin-bottom:4px;">seabedhabitats Areas</div>',
+      '<img src="', seabedhabitats_legend_url, '" />',
+      '</div>'
+    ),position = "bottomright"
+  )
+
 
 # OLD below here ----------------------------------------------------------
 
@@ -599,7 +769,7 @@ browseURL(caps_url)
 # 3) Replace this with a real layer name you see in GetCapabilities
 layer_name <- "emodnet:mean"
 layer_name <- "emodnet:mean_multicolour"
-layer_name_bathy <- "mean_atlas_land"
+layer_name <- "mean_atlas_land"
 
 leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
