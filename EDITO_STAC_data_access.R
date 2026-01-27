@@ -113,7 +113,6 @@ etn_daily_sum <-
 etn_daily_sum_path <- "./data/etn_sum_seabass.rds"
 saveRDS(etn_daily_sum, etn_daily_sum_path)
 
-rm(etn_items, etn_dataset)
 
 # appending row to wms_registry
 wms_registry <- add_row(
@@ -128,6 +127,8 @@ wms_registry <- add_row(
   arrange(desc(.added_at)) %>%
   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
 
+# remove obj
+rm(etn_items, etn_dataset, etn_dataset_href, href, title, etn_daily_sum_path, etn_collection, dataset_name, etn_daily_sum, feature)
 
 ## Offshore Wind Farm -------------------------------------------------------
 
@@ -154,8 +155,6 @@ owf_legend_url <- paste0(
   "&VERSION=1.1.1"
 )
 
-# remove obj we no longer need
-rm(c_owf_list, owf_items)
 
 # # test map
 # leaflet() %>%
@@ -191,6 +190,72 @@ wms_registry <- add_row(
   arrange(desc(.added_at)) %>%
   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
 
+# remove obj we no longer need
+rm(c_owf_list, owf_items, owf_layer_name, owf_wms_link, c_owf_selection, owf_wms_base, owf_legend_url)
+
+## Submarine Power Cables (spc) -------------------------------------------------------
+
+c_spc_list <- c_all %>% dplyr::filter(grepl("cables", c_all$value))
+c_spc_selection <- c_spc_list$value[1]
+
+spc_items <- stac_obj %>%
+  rstac::stac_search(collections = c_spc_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
+
+# wms
+spc_wms_link <- spc_items$features[[2]]$assets$wms$href
+spc_wms_base <- sub("\\?.*$", "", spc_wms_link)
+spc_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", spc_wms_link)
+
+
+## legend
+spc_legend_url <- paste0(
+  spc_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", spc_layer_name,
+  "&VERSION=1.1.1"
+)
+
+
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = spc_wms_base,
+#     layers  = spc_layer_name,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">SPC</div>',
+#       '<img src="', spc_legend_url, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   )
+
+# appending row to wms_registry
+wms_registry <- add_row(
+  wms_registry,
+  env_data_name = "spc",
+  collection_name = c_spc_selection,
+  wms_link    = spc_wms_link,
+  wms_base    = spc_wms_base,
+  wms_layer_name  = spc_layer_name,
+  legend_link = spc_legend_url,
+  .added_at        = Sys.time()) %>%
+  arrange(desc(.added_at)) %>%
+  distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
+
+# remove obj we no longer need
+rm(c_spc_list, spc_items, spc_layer_name, spc_wms_link, c_spc_selection, spc_wms_base, spc_legend_url)
+
 
 ## marine spatial plan -----------------------------------------------------
 
@@ -218,8 +283,6 @@ msp_legend_url <- paste0(
 )
 
 # browseURL(msp_legend_url)
-
-rm(c_msp_list, msp_items)
 
 # # test map
 # leaflet() %>%
@@ -256,6 +319,66 @@ wms_registry <- add_row(
   arrange(desc(.added_at)) %>%
   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
 
+# remove obj we no longer need
+rm(c_msp_list, msp_layer_name, msp_wms_link, msp_wms_base, msp_legend_url)
+
+
+## some EEZs -------------------------------------------
+
+stac_eez_wms_link <- msp_items$features[[4]]$assets$wms$href
+stac_eez_wms_base <- sub("\\?.*$", "", stac_eez_wms_link)
+stac_eez_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", stac_eez_wms_link)
+
+
+## legend
+stac_eez_legend_url <- paste0(
+  stac_eez_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", stac_eez_layer_name,
+  "&VERSION=1.1.1"
+)
+
+# browseURL(stac_eez_legend_url)
+
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = stac_eez_wms_base,
+#     layers  = stac_eez_layer_name,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">stac_eez Areas</div>',
+#       '<img src="', stac_eez_legend_url, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   )
+
+# appending row to wms_registry
+
+wms_registry <- add_row(
+  wms_registry,
+  env_data_name = "stac_eez",
+  collection_name = c_msp_selection,
+  wms_link    = stac_eez_wms_link,
+  wms_base    = stac_eez_wms_base,
+  wms_layer_name  = stac_eez_layer_name,
+  legend_link = stac_eez_legend_url,
+  .added_at        = Sys.time()) %>%
+  arrange(desc(.added_at)) %>%
+  distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
+
+# remove obj we no longer need
+rm(msp_items, stac_eez_layer_name, stac_eez_wms_link, stac_eez_wms_base, c_msp_selection, stac_eez_legend_url)
+
 ## Natura2000 areas -----------------------------------------------------
 
 c_natura2000_list <- c_all %>% dplyr::filter(grepl("protected_areas", c_all$value))
@@ -282,8 +405,6 @@ natura2000_legend_url <- paste0(
 )
 
 # browseURL(natura2000_legend_url)
-
-rm(c_natura2000_list, natura2000_items)
 
 # # test map
 # leaflet() %>%
@@ -320,6 +441,8 @@ wms_registry <- add_row(
   arrange(desc(.added_at)) %>%
   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
 
+# remove obj we no longer need
+rm(c_natura2000_list, natura2000_layer_name, natura2000_wms_link, natura2000_wms_base, natura2000_legend_url)
 
 ## international sea conventions -------------------------------------------
 
@@ -338,8 +461,6 @@ sea_conventions_legend_url <- paste0(
 )
 
 # browseURL(sea_conventions_legend_url)
-
-rm(c_sea_conventions_list, sea_conventions_items)
 
 # # test map
 # leaflet() %>%
@@ -376,6 +497,8 @@ wms_registry <- add_row(
   arrange(desc(.added_at)) %>%
   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
 
+# remove obj we no longer need
+rm(natura2000_items, sea_conventions_layer_name, sea_conventions_wms_link, sea_conventions_wms_base, c_natura2000_selection, sea_conventions_legend_url)
 
 ## bathymetry --------------------------------------------------------------
 
@@ -414,28 +537,28 @@ bathy_legend_url_2 <- paste0(
   "&VERSION=1.1.1"
 )
 
-browseURL(bathy_legend_url_1)
+# browseURL(bathy_legend_url_1)
 
-# test map
-leaflet() %>%
-  setView(3, 51.5, zoom = 8) %>%
-  addTiles() %>%
-  addWMSTiles(
-    baseUrl = bathy_wms_base,
-    layers  = bathy_layer_name_1,
-    options = WMSTileOptions(
-      format = "image/png",
-      transparent = T,
-      opacity = 1
-    )) %>%
-  addControl(
-    html = paste0(
-      '<div style="background:white;padding:6px;border-radius:4px;">',
-      '<div style="font-weight:600;margin-bottom:4px;">Bathymetry</div>',
-      '<img src="', bathy_legend_url_1, '" />',
-      '</div>'
-    ),position = "bottomright"
-  )
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = bathy_wms_base,
+#     layers  = bathy_layer_name_1,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">Bathymetry</div>',
+#       '<img src="', bathy_legend_url_1, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   )
 
 # add both bathymetry layers
 wms_registry <- add_row(
@@ -462,102 +585,105 @@ wms_registry <- add_row(
   arrange(desc(.added_at)) %>%
   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
 
+# remove obj we no longer need
+rm(c_bathy_list, bathy_items, bathy_objects, bathy_layer_name_1, bathy_layer_name_2, bathy_wms_link, c_bathy_selection, bathy_wms_base, bathy_legend_url_1, bathy_legend_url_2)
+
 ## seabedhabitats -doesnt work -----------------------------------------------------
-
-c_seabedhabitats_list <- c_all %>% dplyr::filter(grepl("habitat", c_all$value))
-c_seabedhabitats_selection <- c_seabedhabitats_list$value[42] 
-c_seabedhabitats_selection
-#12 # should be the layer
-# 4 shows sth
-# 5 # gives complete legend: "https://ows.emodnet-seabedhabitats.eu/geoserver/emodnet_view/wms?SERVICE=WMS&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=eunismaps_all&VERSION=1.1.1"
-# 13 shows something but not BPNS
-# 15, 16, 23 only baltic
-# 22 IRL
-# 24 # emodnet-modelled_projections_of_habitat_for_commercial_fish_around_north_western_europe_under_climate_change_2020_to_2060
-# 27 seagrass cover (EOV)
-
-seabedhabitats_items <- stac_obj %>%
-  rstac::stac_search(collections = c_seabedhabitats_selection, limit = 500) %>%
-  rstac::get_request() %>%
-  rstac::items_fetch()
-
-
-# wms
-seabedhabitats_wms_link <- seabedhabitats_items$features[[1]]$assets$wms$href
-seabedhabitats_wms_link
-browseURL(seabedhabitats_wms_link)
-seabedhabitats_wms_base <- sub("\\?.*$", "", seabedhabitats_wms_link)
-seabedhabitats_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", seabedhabitats_wms_link)
-
-# parquet
-seabedhabitats_parquet_link <- seabedhabitats_items$features[[1]]$assets$parquet$href
-seabedhabitats_parquet <- arrow::read_parquet(seabedhabitats_parquet_link, format = "parquet")
 # 
-# library(sf)
-# #library(dplyr)
-# geom_test <- st_as_sfc(as.list(seabedhabitats_parquet$geometry[1:5]), crs = 4326)
-# st_bbox(geom_test)
+# c_seabedhabitats_list <- c_all %>% dplyr::filter(grepl("habitat", c_all$value))
+# c_seabedhabitats_selection <- c_seabedhabitats_list$value[42] 
+# c_seabedhabitats_selection
+# #12 # should be the layer
+# # 4 shows sth
+# # 5 # gives complete legend: "https://ows.emodnet-seabedhabitats.eu/geoserver/emodnet_view/wms?SERVICE=WMS&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=eunismaps_all&VERSION=1.1.1"
+# # 13 shows something but not BPNS
+# # 15, 16, 23 only baltic
+# # 22 IRL
+# # 24 # emodnet-modelled_projections_of_habitat_for_commercial_fish_around_north_western_europe_under_climate_change_2020_to_2060
+# # 27 seagrass cover (EOV)
 # 
-# library(DBI)
-# library(duckdb)
+# seabedhabitats_items <- stac_obj %>%
+#   rstac::stac_search(collections = c_seabedhabitats_selection, limit = 500) %>%
+#   rstac::get_request() %>%
+#   rstac::items_fetch()
 # 
-# con <- dbConnect(duckdb())
 # 
-# dbExecute(con, "INSTALL spatial;")
-# dbExecute(con, "LOAD spatial;")
+# # wms
+# seabedhabitats_wms_link <- seabedhabitats_items$features[[1]]$assets$wms$href
+# seabedhabitats_wms_link
+# browseURL(seabedhabitats_wms_link)
+# seabedhabitats_wms_base <- sub("\\?.*$", "", seabedhabitats_wms_link)
+# seabedhabitats_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", seabedhabitats_wms_link)
 # 
-# sql <- "
-# SELECT *
-# FROM read_parquet($1)
-# WHERE ST_Intersects(
-#   geometry,
-#   ST_MakeEnvelope(2, 50, 6, 52)
+# # parquet
+# seabedhabitats_parquet_link <- seabedhabitats_items$features[[1]]$assets$parquet$href
+# seabedhabitats_parquet <- arrow::read_parquet(seabedhabitats_parquet_link, format = "parquet")
+# # 
+# # library(sf)
+# # #library(dplyr)
+# # geom_test <- st_as_sfc(as.list(seabedhabitats_parquet$geometry[1:5]), crs = 4326)
+# # st_bbox(geom_test)
+# # 
+# # library(DBI)
+# # library(duckdb)
+# # 
+# # con <- dbConnect(duckdb())
+# # 
+# # dbExecute(con, "INSTALL spatial;")
+# # dbExecute(con, "LOAD spatial;")
+# # 
+# # sql <- "
+# # SELECT *
+# # FROM read_parquet($1)
+# # WHERE ST_Intersects(
+# #   geometry,
+# #   ST_MakeEnvelope(2, 50, 6, 52)
+# # )
+# # "
+# # 
+# # subset_df <- dbGetQuery(con, sql, params = list(seabedhabitats_parquet_link))
+# # subset_df <- dbGetQuery(con, sql, params = list(seabedhabitats_parquet_link))
+# # 
+# # dbDisconnect(con, shutdown = TRUE)
+# # 
+# 
+# 
+# #library(sf)
+# #seabedhabitats_p_sf <- sf::st_as_sf(seabedhabitats_parquet)
+# 
+# 
+# ## legend
+# seabedhabitats_legend_url <- paste0(
+#   seabedhabitats_wms_base,
+#   "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+#   "&FORMAT=image/png",
+#   "&LAYER=", seabedhabitats_layer_name,
+#   "&VERSION=1.1.1"
 # )
-# "
 # 
-# subset_df <- dbGetQuery(con, sql, params = list(seabedhabitats_parquet_link))
-# subset_df <- dbGetQuery(con, sql, params = list(seabedhabitats_parquet_link))
+# browseURL(seabedhabitats_legend_url)
 # 
-# dbDisconnect(con, shutdown = TRUE)
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = seabedhabitats_wms_base,
+#     layers  = seabedhabitats_layer_name,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">seabedhabitats Areas</div>',
+#       '<img src="', seabedhabitats_legend_url, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   )
 # 
-
-
-#library(sf)
-#seabedhabitats_p_sf <- sf::st_as_sf(seabedhabitats_parquet)
-
-
-## legend
-seabedhabitats_legend_url <- paste0(
-  seabedhabitats_wms_base,
-  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
-  "&FORMAT=image/png",
-  "&LAYER=", seabedhabitats_layer_name,
-  "&VERSION=1.1.1"
-)
-
-browseURL(seabedhabitats_legend_url)
-
-# test map
-leaflet() %>%
-  setView(3, 51.5, zoom = 8) %>%
-  addTiles() %>%
-  addWMSTiles(
-    baseUrl = seabedhabitats_wms_base,
-    layers  = seabedhabitats_layer_name,
-    options = WMSTileOptions(
-      format = "image/png",
-      transparent = T,
-      opacity = 1
-    )) %>%
-  addControl(
-    html = paste0(
-      '<div style="background:white;padding:6px;border-radius:4px;">',
-      '<div style="font-weight:600;margin-bottom:4px;">seabedhabitats Areas</div>',
-      '<img src="', seabedhabitats_legend_url, '" />',
-      '</div>'
-    ),position = "bottomright"
-  )
-
 
 
 
@@ -594,6 +720,37 @@ wms_registry <- add_row(
   arrange(desc(.added_at)) %>%
   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
 
+## BPNS seabed habitats --------------------------------------------------------------
+# for now from the RBINS geoserver: https://spatial.naturalsciences.be/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?0&filter=false
+
+# wms
+seabedhabitats_wms_link <- "https://spatial.naturalsciences.be/geoserver/od_nature/wms?service=WMS&version=1.1.0&request=GetMap&layers=od_nature%3AHabitat_BPNS_Seafloor&bbox=3783778.2435288355%2C3135783.371861253%2C3859575.3740788964%2C3222401.382971901&width=672&height=768&srs=EPSG%3A3035&styles=&format=application/openlayers"
+seabedhabitats_wms_base <- "https://spatial.naturalsciences.be/geoserver/od_nature/wms"
+seabedhabitats_layer_name <- "od_nature:seabed_substrate_map"
+
+## legend
+seabedhabitats_legend_url <- paste0(
+  seabedhabitats_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", seabedhabitats_layer_name,
+  "&VERSION=1.1.1"
+)
+
+wms_registry <- add_row(
+  wms_registry,
+  env_data_name = "seabedhabitats",
+  collection_name = "",
+  wms_link    = seabedhabitats_wms_link,
+  wms_base    = seabedhabitats_wms_base,
+  wms_layer_name  = seabedhabitats_layer_name,
+  legend_link = seabedhabitats_legend_url,
+  .added_at        = Sys.time()) %>%
+  arrange(desc(.added_at)) %>%
+  distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
+
+# remove obj we no longer need
+rm(seabedhabitats_layer_name, seabedhabitats_wms_link, seabedhabitats_wms_base, seabedhabitats_legend_url)
 
 # SST - TODO --------------------------------------------------------------
 
@@ -603,7 +760,7 @@ wms_registry <- add_row(
 wms_registry_path <- "./data/EDITO_STAC_layers_metadata.csv"
 write.csv(wms_registry, wms_registry_path)
 
-rm(list = ls())
+#rm(list = ls())
 
 # # OLD below here ----------------------------------------------------------
 # 

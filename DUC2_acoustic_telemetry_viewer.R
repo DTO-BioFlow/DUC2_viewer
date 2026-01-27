@@ -10,6 +10,11 @@ blue_light <- "#cde3f6" #"#b3d9f7"
 blue_medium <- "#477292"
 blue_dark <- "#11395a"
 
+
+# load map with all environmental WMS layers ------------------------------
+
+source("leaflet_env_data_layers.R")
+
 ui <- fluidPage(
   
   tags$head(
@@ -62,17 +67,6 @@ ui <- fluidPage(
         color: {blue_dark} !important;}}
   ")))
   ),
-  
-  # # shade the top tabs
-  # tags$head(
-  #   tags$style(HTML(glue::glue("
-  #     .top-tabs > .tabbable > .nav-tabs {{
-  #       background-color: {blue_light} !important;
-  #       padding: 6px 6px 0 6px;
-  #       border-radius: 6px;
-  #     }}
-  # ")))
-  # ),
   
   titlePanel("DUC2: Impact from offshore infrastructures on marine life"),
   mainPanel(width = 12,
@@ -155,7 +149,8 @@ ui <- fluidPage(
             tabPanel("acoustic telemetry data",
                      leafletOutput("seabass_data_map", height = 700), 
                      DTOutput("acoustic_telemetry")),
-            tabPanel("Environmental layers", DTOutput("env_layers"))
+            tabPanel("Environmental layers", 
+                     leafletOutput("env_data_map", height = 700))
           )
         ),
         
@@ -197,6 +192,11 @@ server <- function(input, output, session) {
       addTiles() |>
       setView(lng = 2.5, lat = 51.2, zoom = 6) |>
       addMarkers(lng = 2.5, lat = 51.2, popup = "Example point2!")
+  })
+  
+  ## environmental layers map (with layers (mostly) from EDITO STAC catalogue)
+  output$env_data_map <- renderLeaflet({
+    map_WMS_EDITO_legend
   })
   
   output$PAM_dashboard <- renderDT(cars)
