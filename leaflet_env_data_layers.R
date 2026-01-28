@@ -455,22 +455,22 @@ map_acoustic_detections <-
 
 
 # tests -------------------------------------------------------------------
-install.packages("leaflet.extras2")
-library(leaflet.extras2)
-
-m <- leaflet() %>%
-  addTiles() %>%
-  leaflet.extras2::addEasyprint()
-
-m
-
-map_base %>%
-  leaflet.extras2::addEasyprint(
-    options = leaflet.extras2::easyprintOptions(
-      title = "Export PNG",
-      spinnerBgColor = blue_light,
-      filename = "DTO-Bioflow_DUC2_map",
-      position = "topleft"
-      # other options exist; see ?easyprintOptions
-    )
-  )
+# install.packages("leaflet.extras2")
+# # library(leaflet.extras2)
+# 
+# m <- leaflet() %>%
+#   addTiles() %>%
+#   leaflet.extras2::addEasyprint()
+# 
+# m
+# 
+# map_base %>%
+#   leaflet.extras2::addEasyprint(
+#     options = leaflet.extras2::easyprintOptions(
+#       title = "Export PNG",
+#       spinnerBgColor = blue_light,
+#       filename = "DTO-Bioflow_DUC2_map",
+#       position = "topleft"
+#       # other options exist; see ?easyprintOptions
+#     )
+#   )
