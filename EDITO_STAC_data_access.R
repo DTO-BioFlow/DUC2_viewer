@@ -500,6 +500,7 @@ wms_registry <- add_row(
 # remove obj we no longer need
 rm(natura2000_items, sea_conventions_layer_name, sea_conventions_wms_link, sea_conventions_wms_base, c_natura2000_selection, sea_conventions_legend_url)
 
+
 ## bathymetry --------------------------------------------------------------
 
 c_bathy_list <- c_all %>% dplyr::filter(grepl("elevation", c_all$value))
@@ -588,26 +589,91 @@ wms_registry <- add_row(
 # remove obj we no longer need
 rm(c_bathy_list, bathy_items, bathy_objects, bathy_layer_name_1, bathy_layer_name_2, bathy_wms_link, c_bathy_selection, bathy_wms_base, bathy_legend_url_1, bathy_legend_url_2)
 
+
+## shipwrecks_emodnet -------------------------------------------------------
+
+c_shipwrecks_emodnet_list <- c_all %>% dplyr::filter(grepl("heritage", c_all$value))
+c_shipwrecks_emodnet_selection <- c_shipwrecks_emodnet_list$value[1]
+
+shipwrecks_emodnet_items <- stac_obj %>%
+  rstac::stac_search(collections = c_shipwrecks_emodnet_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
+
+# wms
+shipwrecks_emodnet_wms_link <- shipwrecks_emodnet_items$features[[4]]$assets$wms$href
+shipwrecks_emodnet_wms_base <- sub("\\?.*$", "", shipwrecks_emodnet_wms_link)
+shipwrecks_emodnet_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", shipwrecks_emodnet_wms_link)
+
+
+## legend
+shipwrecks_emodnet_legend_url <- paste0(
+  shipwrecks_emodnet_wms_base,
+  "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+  "&FORMAT=image/png",
+  "&LAYER=", shipwrecks_emodnet_layer_name,
+  "&VERSION=1.1.1"
+)
+
+
+# # test map
+# leaflet() %>%
+#   setView(3, 51.5, zoom = 8) %>%
+#   addTiles() %>%
+#   addWMSTiles(
+#     baseUrl = shipwrecks_emodnet_wms_base,
+#     layers  = shipwrecks_emodnet_layer_name,
+#     options = WMSTileOptions(
+#       format = "image/png",
+#       transparent = T,
+#       opacity = 1
+#     )) %>%
+#   addControl(
+#     html = paste0(
+#       '<div style="background:white;padding:6px;border-radius:4px;">',
+#       '<div style="font-weight:600;margin-bottom:4px;">Wind farms</div>',
+#       '<img src="', shipwrecks_emodnet_legend_url, '" />',
+#       '</div>'
+#     ),position = "bottomright"
+#   )
+
+# appending row to wms_registry
+wms_registry <- add_row(
+  wms_registry,
+  env_data_name = "shipwrecks_emodnet",
+  collection_name = c_shipwrecks_emodnet_selection,
+  wms_link    = shipwrecks_emodnet_wms_link,
+  wms_base    = shipwrecks_emodnet_wms_base,
+  wms_layer_name  = shipwrecks_emodnet_layer_name,
+  legend_link = shipwrecks_emodnet_legend_url,
+  .added_at        = Sys.time()) %>%
+  arrange(desc(.added_at)) %>%
+  distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
+
+# remove obj we no longer need
+rm(c_shipwrecks_emodnet_list, shipwrecks_emodnet_items, shipwrecks_emodnet_layer_name, shipwrecks_emodnet_wms_link, c_shipwrecks_emodnet_selection, shipwrecks_emodnet_wms_base, shipwrecks_emodnet_legend_url)
+
+
 ## seabedhabitats -doesnt work -----------------------------------------------------
 # 
-# c_seabedhabitats_list <- c_all %>% dplyr::filter(grepl("habitat", c_all$value))
-# c_seabedhabitats_selection <- c_seabedhabitats_list$value[42] 
+# c_seabedhabitats_list <- c_all %>% dplyr::filter(grepl("emodnet-seabed_habitats", c_all$value))
+# c_seabedhabitats_selection <- c_seabedhabitats_list$value[1]
 # c_seabedhabitats_selection
-# #12 # should be the layer
-# # 4 shows sth
-# # 5 # gives complete legend: "https://ows.emodnet-seabedhabitats.eu/geoserver/emodnet_view/wms?SERVICE=WMS&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=eunismaps_all&VERSION=1.1.1"
-# # 13 shows something but not BPNS
-# # 15, 16, 23 only baltic
-# # 22 IRL
-# # 24 # emodnet-modelled_projections_of_habitat_for_commercial_fish_around_north_western_europe_under_climate_change_2020_to_2060
-# # 27 seagrass cover (EOV)
-# 
+# # #12 # should be the layer
+# # # 4 shows sth
+# # # 5 # gives complete legend: "https://ows.emodnet-seabedhabitats.eu/geoserver/emodnet_view/wms?SERVICE=WMS&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=eunismaps_all&VERSION=1.1.1"
+# # # 13 shows something but not BPNS
+# # # 15, 16, 23 only baltic
+# # # 22 IRL
+# # # 24 # emodnet-modelled_projections_of_habitat_for_commercial_fish_around_north_western_europe_under_climate_change_2020_to_2060
+# # # 27 seagrass cover (EOV)
+# # 
 # seabedhabitats_items <- stac_obj %>%
 #   rstac::stac_search(collections = c_seabedhabitats_selection, limit = 500) %>%
 #   rstac::get_request() %>%
 #   rstac::items_fetch()
-# 
-# 
+# # 
+# # 
 # # wms
 # seabedhabitats_wms_link <- seabedhabitats_items$features[[1]]$assets$wms$href
 # seabedhabitats_wms_link
@@ -683,7 +749,7 @@ rm(c_bathy_list, bathy_items, bathy_objects, bathy_layer_name_1, bathy_layer_nam
 #       '</div>'
 #     ),position = "bottomright"
 #   )
-# 
+
 
 
 
@@ -754,434 +820,142 @@ rm(seabedhabitats_layer_name, seabedhabitats_wms_link, seabedhabitats_wms_base, 
 
 # SST - TODO --------------------------------------------------------------
 
-"climate_forecast-sea_surface_temperature" # right collection?
+c_sst_list <- c_all %>% dplyr::filter(grepl("sea_surface_foundation_temperature", c_all$value))
+c_sst_selection <- c_sst_list$value[1]
+
+sst_items <- stac_obj %>%
+  rstac::stac_search(collections = c_sst_selection, limit = 500) %>%
+  rstac::get_request() %>%
+  rstac::items_fetch()
+
+sst_selected_item <- sst_items$features[[37]]
+sst_selected_item
+
+
+## wmts --------------------------------------------------------------------
+# 
+# sst_wms_link <- sst_selected_item$assets$wmts$href
+# sst_wms_link #%>% browseURL()
+# 
+# parse_wmts_href <- function(href) {
+#   u <- xml2::url_parse(href)
+#   q <- u$query
+#   
+#   # base endpoint = scheme + host + path (without query)
+#   base <- paste0(u$scheme, "://", u$server, u$path)
+#   
+#   layer <- sub("^.*(?:^|&)?layer=([^&]+).*$", "\\1", u$query)
+#   if (identical(layer, u$query)) stop("Could not find 'layer=' in query: ", u$query)
+#   
+#   list(base = base, layer = layer)
+# }
+# 
+# wmts_info <- parse_wmts_href(sst_wms_link)
+# wmts_base  <- wmts_info$base
+# wmts_layer <- wmts_info$layer
+# 
+# wmts_base
+# wmts_layer
+# 
+# get_wmts_metadata <- function(base, layer_id) {
+#   cap_url <- paste0(base, "?SERVICE=WMTS&REQUEST=GetCapabilities")
+#   cap_xml <- read_xml(cap_url)
+#   ns <- xml_ns(cap_xml)
+#   
+#   layer_node <- xml_find_first(
+#     cap_xml,
+#     paste0(".//wmts:Layer[ows:Identifier='", layer_id, "']"),
+#     ns
+#   )
+#   if (is.na(layer_node)) stop("Layer not found in GetCapabilities: ", layer_id)
+#   
+#   # tile matrix sets for this layer
+#   tms <- xml_text(xml_find_all(layer_node, ".//wmts:TileMatrixSetLink/wmts:TileMatrixSet", ns))
+#   tms <- unique(tms)
+#   
+#   # try to pick a Leaflet-friendly one if present
+#   tms_pick <- if ("GoogleMapsCompatible" %in% tms) "GoogleMapsCompatible" else tms[1]
+#   
+#   # dimension names (often includes Time/TIME)
+#   dim_names <- xml_text(xml_find_all(layer_node, ".//wmts:Dimension/ows:Identifier", ns))
+#   
+#   # values are sometimes huge; we’ll just keep a few
+#   dim_values <- xml_text(xml_find_all(layer_node, ".//wmts:Dimension/wmts:Value", ns))
+#   
+#   list(
+#     cap_url = cap_url,
+#     tms_available = tms,
+#     tms_pick = tms_pick,
+#     dim_names = dim_names,
+#     dim_values_head = head(dim_values, 20)
+#   )
+# }
+# 
+# wmts_meta <- get_wmts_metadata(wmts_base, wmts_layer)
+# 
+# wmts_meta$tms_available
+# wmts_meta$tms_pick
+# wmts_meta$dim_names
+# wmts_meta$dim_values_head
+
+# 
+# # wms
+# sst_wms_link <- sst_items$features[[2]]$assets$wms$href
+# sst_wms_base <- sub("\\?.*$", "", sst_wms_link)
+# sst_layer_name <- sub(".*LAYERS=([A-Za-z0-9_:]+).*", "\\1", sst_wms_link)
+# 
+# 
+# ## legend
+# sst_legend_url <- paste0(
+#   sst_wms_base,
+#   "?SERVICE=WMS&REQUEST=GetLegendGraphic",
+#   "&FORMAT=image/png",
+#   "&LAYER=", sst_layer_name,
+#   "&VERSION=1.1.1"
+# )
+# 
+# 
+# # # test map
+# # leaflet() %>%
+# #   setView(3, 51.5, zoom = 8) %>%
+# #   addTiles() %>%
+# #   addWMSTiles(
+# #     baseUrl = sst_wms_base,
+# #     layers  = sst_layer_name,
+# #     options = WMSTileOptions(
+# #       format = "image/png",
+# #       transparent = T,
+# #       opacity = 1
+# #     )) %>%
+# #   addControl(
+# #     html = paste0(
+# #       '<div style="background:white;padding:6px;border-radius:4px;">',
+# #       '<div style="font-weight:600;margin-bottom:4px;">Wind farms</div>',
+# #       '<img src="', sst_legend_url, '" />',
+# #       '</div>'
+# #     ),position = "bottomright"
+# #   )
+# 
+# # appending row to wms_registry
+# wms_registry <- add_row(
+#   wms_registry,
+#   env_data_name = "sst",
+#   collection_name = c_sst_selection,
+#   wms_link    = sst_wms_link,
+#   wms_base    = sst_wms_base,
+#   wms_layer_name  = sst_layer_name,
+#   legend_link = sst_legend_url,
+#   .added_at        = Sys.time()) %>%
+#   arrange(desc(.added_at)) %>%
+#   distinct(env_data_name, wms_link, wms_layer_name, .keep_all = TRUE) 
+# 
+# # remove obj we no longer need
+# rm(c_sst_list, sst_items, sst_layer_name, sst_wms_link, c_sst_selection, sst_wms_base, sst_legend_url)
+# 
+
 
 # save wms registry -------------------------------------------------------
 wms_registry_path <- "./data/EDITO_STAC_layers_metadata.csv"
 write.csv(wms_registry, wms_registry_path)
 
 #rm(list = ls())
-
-# # OLD below here ----------------------------------------------------------
-# 
-# # get all relevant collections--------------------------------------------
-# ## collection names
-# c_ETN_data <- "animal_tracking_datasets"
-# 
-# c_bathy_list <- c_all %>% dplyr::filter(grepl("bathymetry", c_all$value))
-# c_bathy_selection <- "emodnet-bathymetry"
-# 
-# c_owf_list <- c_all %>% dplyr::filter(grepl("wind", c_all$value))
-# c_owf_selection <- c("emodnet-wind_farm_power_mw")
-# 
-# #col_shipwrecks <- col_all %>% dplyr::filter(grepl("ship_wreck", col_all$value))
-# 
-# 
-# # etn data ----------------------------------------------------------------
-# 
-# animal_tracking_col <- stac_obj %>%
-#   collections(c_ETN_data)%>%
-#   get_request()
-# 
-# #etn_link <- paste0(api_endpoint_url, c_ETN_data)
-# # # items - probably not needed!
-# # item_obj <- rstac::items(col_obj) %>%
-# #   rstac::get_request()
-# 
-# etn_items <- stac_obj %>%
-#   rstac::stac_search(collections = "animal_tracking_datasets") %>%
-#   rstac::get_request()%>%
-#   rstac::items_fetch()
-# 
-# etn_link_href <- etn_items$features[[13]]$assets$data$href
-# 
-# etn_seabass <- arrow::read_parquet(etn_link_href, format = "parquet")
-# 
-# 
-# # OWF ---------------------------------------------------------------------
-# 
-# OWF_col <- stac_obj %>%
-#   collections(c_owf_selection)%>%
-#   get_request()
-# 
-# owf_items <- stac_obj %>%
-#   stac_search(collections = c_owf_selection, limit = 500) %>%
-#   get_request() %>%
-#   items_fetch()
-# 
-# # wms
-# owf_link_wms_href <- owf_items$features[[1]]$assets$wms$href
-# 
-# wms_base <- "https://ows.emodnet-humanactivities.eu/wms" #TODO: make programmatically
-# wms_base_owf <- sub("\\?.*$", "", owf_link_wms_href)
-# layer_name_owf <- "windfarmspoly" #TODO: make programmatically
-# 
-# 
-# # legend
-# 
-# legend_url <- paste0(
-#   wms_base,
-#   "?SERVICE=WMS&REQUEST=GetLegendGraphic",
-#   "&FORMAT=image/png",
-#   "&LAYER=", layer_name_owf,
-#   "&VERSION=1.1.1"
-# )
-# 
-# legend_url
-# browseURL(legend_url)   # opens the legend image in your browser
-# 
-# 
-# # EEZs --------------------------------------------------------------------
-# 
-# mregions2::mrp_list %>% View()
-# 
-# leaflet() %>%
-#   addWMSTiles(
-#     baseUrl = "https://geo.vliz.be/geoserver/MarineRegions/wms",
-#     layers = "eez",   # replace with your layer name
-#     options = WMSTileOptions(
-#       format = "image/png",
-#       styles = "Polygons_greyoutline",
-#       transparent = TRU
-#     )
-#     
-#   )
-# 
-# library(mregions2)
-# library(leaflet)
-# library(dplyr)
-# 
-# m <- 
-#   leaflet::leaflet() %>% 
-#   addWMSTiles(
-#     baseUrl = "https://geo.vliz.be/geoserver/MarineRegions/wms",
-#     layers = "iho",   # replace with your layer name
-#     options = WMSTileOptions(
-#       format = "image/png",
-#       styles = "Polygons_greyoutline",
-#       transparent = T
-#     )
-#   )
-# 
-# str(m)
-# 
-# # Leaflet CRS definition for EPSG:4326 (degrees)
-# 
-# 
-# crs4326 <- leafletCRS(
-#   crsClass = "L.CRS.EPSG4326",
-#   code = "EPSG:4326",
-#   proj4def = "+proj=longlat +datum=WGS84 +no_defs",
-#   resolutions = 1.40625 / (2^(0:18))
-# )
-# 
-# leaflet(options = leafletOptions(crs = crs4326)) %>%
-#   fitBounds(-180, -63, 180, 87) %>%
-#   addWMSTiles(
-#     baseUrl = "https://geo.vliz.be/geoserver/MarineRegions/wms",
-#     layers  = "MarineRegions:eez",
-#     options = WMSTileOptions(
-#       version     = "1.1.1",
-#       format      = "image/png",
-#       transparent = TRUE,
-#       styles      = ""
-#     )
-#   )
-# 
-# 
-# leaflet() %>%
-#  # setView(0, 20, 2) %>%
-#   
-#   addWMSTiles(
-#     baseUrl = "https://geo.vliz.be/geoserver/MarineRegions/wms",
-#     layers  = "MarineRegions:eez",
-#     options = WMSTileOptions(
-#       version     = "1.1.1",
-#       srs         = "EPSG:3857",   # 🔴 EXPLICITLY FORCE SRS
-#       format      = "image/png",
-#       transparent = TRUE,
-#       styles      = ""
-#     )
-#   )
-# # map ---------------------------------------------------------------------
-# 
-# 
-# 
-# 
-# # map
-# 
-# library(leaflet)
-# library(magrittr)
-# 
-# leaflet() %>%
-#   addTiles() %>%
-#   addWMSTiles(
-#     baseUrl = wms_base_owf,
-#     layers  = layer_name_owf,
-#     options = WMSTileOptions(
-#       format = "image/png",
-#       transparent = TRUE
-#     ))
-# 
-# m <- leaflet() %>%
-#   # --- Base map (background) ---
-#   addProviderTiles("CartoDB.Positron", group = "CartoDB.Positron") %>%
-#   
-#   # --- Optional: Bathymetry as a BASE layer (select one base at a time) ---
-#   addWMSTiles(
-#     baseUrl = wms_base_bathy,
-#     layers  = layer_name_bathy,
-#     options = WMSTileOptions(
-#       format = "image/png",
-#       transparent = TRUE
-#     ),
-#     group = "EMODnet Bathymetry"
-#   ) %>%
-#   
-#   # --- Overlays (toggle on/off) ---
-#   addWMSTiles(
-#     baseUrl = wms_base_owf,
-#     layers  = layer_name_owf,
-#     options = WMSTileOptions(
-#       format = "image/png",
-#       transparent = TRUE
-#     ),
-#     group = "OWF"  # IMPORTANT: group belongs here (not inside WMSTileOptions)
-#   ) %>%
-#   
-#   addWMSTiles(
-#     baseUrl = "https://geo.vliz.be/geoserver/MarineRegions/wms",
-#     layers  = "eez",
-#     options = WMSTileOptions(
-#       format = "image/png",
-#       styles = "Polygons_greyoutline",
-#       transparent = F),
-#     group = "EEZ"
-#   ) %>%
-#   
-#   # --- Legend / control ---
-#   addControl(
-#     html = paste0(
-#       '<div style="background:white;padding:6px;border-radius:4px;">',
-#       '<div style="font-weight:600;margin-bottom:4px;">Wind farms</div>',
-#       '<img src="', legend_url, '" />',
-#       '</div>'
-#     ),
-#     position = "bottomright"
-#   ) %>%
-#   
-#   # --- Layer switcher ---
-#   addLayersControl(
-#     baseGroups    = c("EMODnet Bathymetry", "CartoDB.Positron", "OWF", "EEZ"),
-#     overlayGroups = c("OWF", "EEZ"),
-#     options       = layersControlOptions(collapsed = FALSE)
-#   )
-# 
-# m
-# 
-# # tests
-# leaflet() %>%
-#   addWMSTiles(
-#     baseUrl = "https://geo.vliz.be/geoserver/MarineRegions/wms",
-#     layers  = "eez",   # FULL qualified layer name
-#     options = WMSTileOptions(
-#       format      = "image/png",
-#       transparent = TRUE,
-#       styles      = "",              # empty style ensures default drawing
-#       version     = "1.1.1"          # use WMS 1.1.1 for Leaflet compatibility
-#     ),
-#     group = "EEZ"
-#   )
-# 
-# leaflet() %>%
-#   #addTiles() %>%
-#   addWMSTiles(
-#     baseUrl = "https://geo.vliz.be/geoserver/Belgium/wms",
-#     layers  = "Belgium"
-#   )
-# 
-# # leaflet() %>% 
-# #   addProviderTiles("CartoDB.Positron", group = "CartoDB.Positron") %>%
-# #   addWMSTiles(
-# #     baseUrl = wms_base,
-# #     layers  = layer_name,
-# #     options = WMSTileOptions(
-# #       format = "image/png",
-# #       transparent = TRUE,
-# #       group = "OWF"
-# #     )) %>%
-# #       addWMSTiles(
-# #         baseUrl = "https://geo.vliz.be/geoserver/MarineRegions/wms",
-# #         layers = "eez",   # replace with your layer name
-# #         options = WMSTileOptions(
-# #           format = "image/png",
-# #           styles = "Polygons_greyoutline",
-# #           transparent = TRUE,
-# #           group = "EEZ"
-# #         )) %>%
-# #     addWMSTiles(
-# #       baseUrl = wms_base_bathy,
-# #       layers  = layer_name_bathy,
-# #       options = WMSTileOptions(format = "image/png", transparent = TRUE),
-# #       group = "EMODnet Bathymetry"
-# #     ) %>%
-# #   addControl(
-# #     html = paste0('<div style="background:white;padding:0px;border-radius:1px;">',
-# #                   '<div style="font-weight:600;margin-bottom:1px;">Wind farms</div>',
-# #                   '<img src="', legend_url, '" />',
-# #                   '</div>'),
-# #     position = "bottomright"
-# #   ) %>%
-# #   addLayersControl(
-# #     baseGroups = c(
-# #       "CartoDB.Positron", "EMODnet Bathymetry"),
-# #     overlayGroups = c("OWF", "EEZ"),
-# #     options = layersControlOptions(collapsed = FALSE)
-# #   )
-# 
-# # bathymetry --------------------------------------------------------------
-# 
-# bathy_objects <- stac_obj %>%
-#   rstac::collections(c_bathy_selection)%>%
-#   rstac::get_request()
-# 
-# bathy_items <- stac_obj %>%
-#   rstac::stac_search(collections = c_bathy_selection) %>%
-#   rstac::get_request()%>%
-#   rstac::items_fetch()
-# 
-# test <- bathy_items$features[[20]]
-# bathy_link_href <- bathy_items$features[[20]]$assets$data$href
-# 
-# arrow::open_dataset(test[["url"]])
-# 
-# rstac::assets_url(test)                 # all asset hrefs
-# 
-# 
-# # chatgpt suggestions -----------------------------------------------------
-# 
-# library(rstac)
-# library(purrr)
-# library(dplyr)
-# library(leaflet)
-# 
-# # bathy_items is your rstac items object
-# 
-# # 1) Find an item that actually has a WMS asset
-# has_asset <- function(item, asset_name) {
-#   !is.null(item$assets[[asset_name]]) && !is.null(item$assets[[asset_name]]$href)
-# }
-# 
-# idx_wms <- which(map_lgl(bathy_items$features, has_asset, asset_name = "wms"))[1]
-# 
-# stopifnot(!is.na(idx_wms))  # will error if no WMS found
-# 
-# wms_item <- bathy_items$features[[idx_wms]]
-# wms_href <- wms_item$assets$wms$href
-# wms_href
-# # print it so you can inspect the URL
-# 
-# # 2) Add it in leaflet
-# # Leaflet needs:
-# #   - a base WMS URL (usually the part before the '?')
-# #   - one or more layer names (often you can discover these from GetCapabilities)
-# wms_base_bathy <- sub("\\?.*$", "", wms_href)
-# 
-# # GetCapabilities URL (helps you discover the 'layers' name)
-# caps_url <- paste0(wms_base, "?service=WMS&request=GetCapabilities")
-# browseURL(caps_url)
-# 
-# # 3) Replace this with a real layer name you see in GetCapabilities
-# layer_name <- "emodnet:mean"
-# layer_name <- "emodnet:mean_multicolour"
-# layer_name <- "mean_atlas_land"
-# 
-# leaflet() %>%
-#   addProviderTiles("CartoDB.Positron") %>%
-#   addWMSTiles(
-#     baseUrl = wms_base,
-#     layers  = layer_name,
-#     options = WMSTileOptions(format = "image/png", transparent = TRUE)
-#   )
-# 
-# 
-# # geotiff -----------------------------------------------------------------
-# 
-# library(terra)
-# library(leaflet)
-# 
-# idx_tif <- which(map_lgl(bathy_items$features, has_asset, asset_name = "geotiff"))[1]
-# tif_href <- bathy_items$features[[idx_tif]]$assets$geotiff$href
-# 
-# # download (recommended for https) then read
-# tf <- tempfile(fileext = ".tif")
-# download.file(tif_href, tf, mode = "wb")
-# 
-# r <- terra::rast(tf)
-# 
-# leaflet() %>%
-#   addProviderTiles("CartoDB.Positron") %>%
-#   addRasterImage(r, opacity = 0.7)
-# 
-# 
-# # other -------------------------------------------------------------------
-# 
-# 
-# 
-# # bathy_href <- bathy_objects[["url"]]
-# # arrow::open_dataset(bathy_href)
-# 
-# 
-# # shipwrecks --------------------------------------------------------------
-# 
-# shipwreck_projectid <- "emodnet_bathymetry_ship_wreck"
-# 
-# shipwreck <- bathy_items %>% dplyr::filter(grepl(shipwreck_projectid, bathy_items[["features"]][[1]][["properties"]][["productIdentifier"]]))
-# 
-# # connect_eurobis <- function(){data_lake <- arrow::S3FileSystem$create(
-# #   anonymous = T,
-# #   scheme = "https",
-# #   endpoint_override = "s3.waw3-1.cloudferro.com"
-# # )
-# # 
-# # s3_path = "emodnet/emodnet_biology/12639/eurobis_gslayer_obisenv_19022025.parquet"
-# # eurobis <- arrow::open_dataset(
-# #   s3_path,
-# #   filesystem = data_lake,
-# #   format = "parquet"
-# # )
-# # return(eurobis)
-# #}
-# # Do this when: This is a direct connection to the S3 bucket, using Arrow’s S3FileSystem.
-# # 
-# # Advantages:
-# #   
-# #   Works with very large datasets that don’t fit in memory.
-# # 
-# # Allows querying, filtering, and joining without downloading the full file.
-# # 
-# # Can read Parquet natively, no need to convert.
-# # 
-# # But otherwise just
-# # 
-# # test <- arrow::read_parquet(link_href)
-# # 
-# # stac_obj
-# # 
-# # 3️⃣ How to “load” a dataset
-# # 
-# # Usually, you want something like:
-# #   
-# #   first_item <- items$features[[1]]
-# # first_item$assets$tracking_data$href  # URL to the actual CSV / NetCDF / file
-# # 
-# # 
-# # Then you can read it in R:
-# #   
-# #   read.csv(first_item$assets$tracking_data$href)
-# # 
-# # 
-# # Or, if it’s a raster/NetCDF:
-# #   
-# #   library(terra)
-# # rast(first_item$assets$tracking_data$href)

@@ -13,12 +13,14 @@
 
 # install and load libraries ----------------------------------------------
 # install.packages("leaflet.extras")
+# install.packages("leaflet.minicharts")
 # install.packages("leafem")
 library(dplyr)
 library(leaflet)
-library(leaflet.extras)
+library(leaflet.extras) 
 library(leafem)
 library(htmlwidgets)
+# library(leaflet.minicharts) # for the map with acoustic detection data
 
 # colors
 blue_light <- "#cde3f6" 
@@ -31,8 +33,8 @@ if(!file.exists("./data/EDITO_STAC_layers_metadata.csv")){
   }
 # read in WMS layer metadata
 wms_layers <- 
-  wms_registry %>%
-  # read.csv("./data/EDITO_STAC_layers_metadata.csv") %>%
+  # wms_registry %>%
+  read.csv("./data/EDITO_STAC_layers_metadata.csv") %>%
   split(.$env_data_name)
 
 
@@ -45,11 +47,12 @@ north.arrow.icon <-
 map_base <-
   leaflet() %>%
   setView(3, 51.5, zoom = 8) %>%
-  addTiles(group = "Open Street Map") %>%
-  addProviderTiles("CartoDB.Positron",
-                   group = "CartoDB.Positron") %>%
+  addMapPane("basePane", zIndex = 100) %>%
+  addTiles(group = "Open Street Map", options = WMSTileOptions(pane="basePane")) %>%
   addTiles(urlTemplate = "https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png",
-           group = "EMODnet Bathymetry") %>%
+           group = "EMODnet Bathymetry", options = WMSTileOptions(pane="basePane")) %>%
+  addProviderTiles("CartoDB.Positron",
+                   group = "CartoDB.Positron", options = WMSTileOptions(pane="basePane")) %>%
   leafem::addMouseCoordinates() %>%
   leaflet.extras::addFullscreenControl() %>%
   leaflet::addScaleBar(position = "bottomleft",
@@ -71,9 +74,15 @@ map_base <-
              aimingRectOptions = list(color = blue_medium, weight = 1, clickable = FALSE),
              shadowRectOptions = list(color = blue_dark, weight = 1, clickable = FALSE, opacity = 0, fillOpacity = 0)
              # ,tiles = providers$Esri.WorldStreetMap
-             , tiles = "https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png"
-             
-  )
+             , tiles = "https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png") #%>%
+  
+  # print button # loading a long time for now...investigate
+  # leaflet.extras2::addEasyprint(
+  #   options = leaflet.extras2::easyprintOptions(
+  #     title = "Export PNG",
+  #     spinnerBgColor = blue_light,
+  #     filename = "DTO-Bioflow_DUC2_map",
+  #     position = "topleft"))
 
 # map_base
 
@@ -91,17 +100,59 @@ legend_control <- function(id, title, img_url) {
   )
 }
 
-# add WMS layers to leaflet map --------------------------------------------------------
+# make full WMS layer leaflet map --------------------------------------------------------
 
 map_WMS_EDITO <-
   map_base %>%
   
-  ## Note: map layers will be plotted in the order of appearance of the layers below
 
+# map panes ---------------------------------------------------------------
+# panes control the z value of the layers, ensuring that the order of plotting stays clean
+  addMapPane("rasterPane", zIndex = 200) %>%
+  addMapPane("vectorPane", zIndex = 300) %>%
+  addMapPane("boundaryPane", zIndex = 400) %>%
+  addMapPane("markerPane", zIndex = 500) %>%
+  
+  ## OWF WMS --------
+  addWMSTiles(
+    baseUrl = wms_layers$owf$wms_base, layers = wms_layers$owf$wms_layer_name,
+    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 1, pane = "boundaryPane"),
+    group = "Offshore Wind Farms (OWF)") %>%
+    addControl(
+      html = legend_control("legend-owf", "OWF status", wms_layers$owf$legend_link),
+      position = "topright") %>%
+  
+    ## spc WMS --------
+  addWMSTiles(
+    baseUrl = wms_layers$spc$wms_base, layers = wms_layers$spc$wms_layer_name,
+    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 0.5, pane = "boundaryPane"),
+    group = "Submarine Power Cables (SPC)") %>%
+    addControl(
+      html = legend_control("legend-spc", "Cable owner", wms_layers$spc$legend_link),
+      position = "topright") %>%  
+
+  ## MSP WMS --------
+  addWMSTiles(
+    baseUrl = wms_layers$msp$wms_base, layers = wms_layers$msp$wms_layer_name,
+    options = WMSTileOptions(format = "image/png", transparent = T, pane = "vectorPane", opcaity = 0.75),
+    group = "Marine Spatial Plans") %>%
+    addControl(
+      html = legend_control("legend-msp", "Human Activities", wms_layers$msp$legend_link),
+      position = "topright") %>%
+    
+  ## sea_conventions WMS --------
+  addWMSTiles(
+    baseUrl = wms_layers$sea_conventions$wms_base, layers = wms_layers$sea_conventions$wms_layer_name,
+    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 1, pane = "vectorPane"),
+    group = "Sea convention polygons") %>%
+    addControl(
+      html = legend_control("legend-sea_conventions", "Convention framework", wms_layers$sea_conventions$legend_link),
+      position = "topright") %>%
+  
   ## seabed habitats WMS --------
   addWMSTiles(
     baseUrl = wms_layers$seabedhabitats$wms_base, layers = wms_layers$seabedhabitats$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T),
+    options = WMSTileOptions(format = "image/png", transparent = T, pane = "rasterPane"),
     group = "Seabed substrates") %>%
     addControl(
       html = legend_control("legend-seabedhabitats", "Substrate type", wms_layers$seabedhabitats$legend_link),
@@ -110,69 +161,43 @@ map_WMS_EDITO <-
   ## bathymetry WMS --------
   addWMSTiles(
     baseUrl = wms_layers$bathy_multicolor$wms_base, layers = wms_layers$bathy_multicolor$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 0.5),
+    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 0.5, pane = "rasterPane"),
     group = "Bathymetry (multicolor)") %>%
     addControl(
       html = legend_control("legend-bathy", "Depth", wms_layers$bathy_multicolor$legend_link),
       position = "topright") %>%
+  
     
   ## EEZ WMS --------
   # from a human activities layer in the STAC catalogue
   addWMSTiles(
     baseUrl = wms_layers$stac_eez$wms_base, layers = wms_layers$stac_eez$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T), #, styles = "Polygons_greyoutline"
+    options = WMSTileOptions(format = "image/png", transparent = T, pane = "boundaryPane"), #, styles = "Polygons_greyoutline"
     group = "Exclusive Economic Zones (EEZ)") %>%
   
   # from the VLIZ geoserver (does not work all the time in the EDITO datalab)
   addWMSTiles(
     baseUrl = wms_layers$eez$wms_base, layers = wms_layers$eez$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T, styles = "Polygons_greyoutline"),
+    options = WMSTileOptions(format = "image/png", transparent = T, styles = "Polygons_greyoutline", pane = "boundaryPane"),
     group = "Exclusive Economic Zones (EEZ)") %>%
   
-  ## MSP WMS --------
+  ## shipwrecks EMODnet --------
   addWMSTiles(
-    baseUrl = wms_layers$msp$wms_base, layers = wms_layers$msp$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T),
-    group = "Marine Spatial Plans") %>%
+    baseUrl = wms_layers$shipwrecks_emodnet$wms_base, layers = wms_layers$shipwrecks_emodnet$wms_layer_name,
+    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 0.5, pane = "markerPane"),
+    group = "Shipwrecks in EU waters") %>%
     addControl(
-      html = legend_control("legend-msp", "Activity", wms_layers$msp$legend_link),
-      position = "topright") %>%
-  
-  ## sea_conventions WMS --------
-  addWMSTiles(
-    baseUrl = wms_layers$sea_conventions$wms_base, layers = wms_layers$sea_conventions$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 0.75),
-    group = "Sea convention polygons") %>%
-    addControl(
-      html = legend_control("legend-sea_conventions", "Convention framework", wms_layers$sea_conventions$legend_link),
-      position = "topright") %>%
-  
-  ## spc WMS --------
-  addWMSTiles(
-    baseUrl = wms_layers$spc$wms_base, layers = wms_layers$spc$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T),
-    group = "Submarine Power Cables (SPC)") %>%
-    addControl(
-      html = legend_control("legend-spc", "Cable owner", wms_layers$spc$legend_link),
-      position = "topright") %>%  
-  
-  ## OWF WMS --------
-  addWMSTiles(
-    baseUrl = wms_layers$owf$wms_base, layers = wms_layers$owf$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T, opacity = 1),
-    group = "Offshore Wind Farms (OWF)") %>%
-    addControl(
-      html = legend_control("legend-owf", "OWF status", wms_layers$owf$legend_link),
+      html = legend_control("legend-shipwrecks", "", wms_layers$shipwrecks_emodnet$legend_link),
       position = "topright") %>%
   
   ## shipwrecks WMS --------
   addWMSTiles(
     baseUrl = wms_layers$shipwrecks$wms_base, layers = wms_layers$shipwrecks$wms_layer_name,
-    options = WMSTileOptions(format = "image/png", transparent = T),
+    options = WMSTileOptions(format = "image/png", transparent = T, pane = "markerPane"),
     group = "Shipwrecks inside the Belgian North Sea") %>%
 
 # hide some layers at the start -------------------------------------------
-  hideGroup(c("Bathymetry (multicolor)", "Seabed substrates", "Sea convention polygons", "Marine Spatial Plans", "Submarine Power Cables (SPC)"))
+  hideGroup(c("Bathymetry (multicolor)", "Seabed substrates", "Sea convention polygons", "Marine Spatial Plans", "Submarine Power Cables (SPC)", "Shipwrecks in EU waters"))
   
 #map_WMS_EDITO
 
@@ -186,13 +211,19 @@ legend_map <- list(
   "Marine Spatial Plans" = "legend-msp",
   "Sea convention polygons" = "legend-sea_conventions",
   "Seabed substrates" = "legend-seabedhabitats",
-  "Bathymetry (multicolor)" = "legend-bathy"
+  "Bathymetry (multicolor)" = "legend-bathy",
+  "Shipwrecks in EU waters" = "legend-shipwrecks"
   # add more: "EEZ" = "legend-eez", ...
 )
 
 overlay_sections <- list(
-  "Management layers" = c("MSP", "Offshore Wind Farms (OWF)", "Submarine Power Cables (SPC)", "Sea convention polygons"),
+  "Human Activities layers" = c("MSP", "Offshore Wind Farms (OWF)", "Submarine Power Cables (SPC)", "Sea convention polygons", "Shipwrecks in EU waters"),
   "Natural layers"    = c("Bathymetry (multicolor)", "Seabed substrates")
+)
+
+payload <- list(
+  legends = legend_map,
+  sections = overlay_sections
 )
 
 map_WMS_EDITO_legend <- 
@@ -200,11 +231,138 @@ map_WMS_EDITO_legend <-
 
 # Layer control -----------------------------------------------------------
     addLayersControl(
-      baseGroups = c("Open Street Map", "EMODnet Bathymetry", "CartoDB.Positron"),
+      baseGroups = c("CartoDB.Positron", "Open Street Map", "EMODnet Bathymetry"),
       overlayGroups = names(legend_map),
       options = layersControlOptions(collapsed = FALSE),
       position = "bottomleft"
     ) %>%
+  # htmlwidgets::onRender(
+  #   "
+  # function(el, x, payload){
+  #   var map = this;
+  #   var legends  = payload.legends  || {};
+  #   var sections = payload.sections || {};
+  # 
+  #   function norm(s){ return (s || '').replace(/\\s+/g, ' ').trim(); }
+  # 
+  #   function showByLayer(layerName, visible){
+  #     var id = legends[layerName];
+  #     if(!id) return;
+  #     var node = document.getElementById(id);
+  #     if(!node) return;
+  #     node.style.display = visible ? 'block' : 'none';
+  #   }
+  # 
+  #   function addBaseHeadingOnce(){
+  #     if(el.querySelector('.base-heading')) return;
+  # 
+  #     var base = el.querySelector('.leaflet-control-layers-base');
+  #     if(!base) return;
+  # 
+  #     var hd = document.createElement('div');
+  #     hd.className = 'base-heading';
+  #     hd.style.textAlign = 'left';     // left aligned
+  #     hd.style.fontWeight = '600';
+  #     hd.style.marginBottom = '4px';
+  #     hd.style.paddingLeft = '2px';
+  #     hd.textContent = 'Background map';
+  #     base.prepend(hd);
+  #   }
+  # 
+  #   function groupOverlaysOnce(){
+  #     var overlays = el.querySelector('.leaflet-control-layers-overlays');
+  #     if(!overlays) return;
+  # 
+  #     // Don't regroup if already done
+  #     if(overlays.dataset.grouped === '1') return;
+  #     overlays.dataset.grouped = '1';
+  # 
+  #     function labelName(lab){
+  #       var txt = '';
+  #       lab.childNodes.forEach(function(n){
+  #         if(n.nodeType === 3) txt += n.nodeValue; // text nodes only
+  #       });
+  #       return norm(txt);
+  #     }
+  # 
+  #     // Cache existing label nodes (these contain the real checkboxes)
+  #     var labelNodes = {};
+  #     Array.from(overlays.querySelectorAll('label')).forEach(function(lab){
+  #       var name = labelName(lab);
+  #       if(name) labelNodes[name] = lab;
+  #     });
+  # 
+  #     // Clear overlays SAFELY (do NOT use innerHTML='')
+  #     while (overlays.firstChild) overlays.removeChild(overlays.firstChild);
+  # 
+  #     // Rebuild with headings + existing labels (moving nodes preserves behavior)
+  #     Object.keys(sections).forEach(function(sectionName){
+  #       var heading = document.createElement('div');
+  #       heading.className = 'overlay-heading';
+  #       heading.textContent = sectionName;
+  #       heading.style.fontWeight = '600';
+  #       heading.style.margin = '6px 0 2px 0';
+  #       heading.style.borderTop = '1px solid rgba(0,0,0,0.15)';
+  #       heading.style.paddingTop = '6px';
+  #       overlays.appendChild(heading);
+  # 
+  #       (sections[sectionName] || []).forEach(function(layerName){
+  #         if(labelNodes[layerName]) overlays.appendChild(labelNodes[layerName]);
+  #       });
+  #     });
+  # 
+  #     // Optional: append overlays not listed in sections
+  #     Object.keys(labelNodes).forEach(function(layerName){
+  #       var placed = false;
+  #       Object.keys(sections).forEach(function(sec){
+  #         if((sections[sec] || []).indexOf(layerName) !== -1) placed = true;
+  #       });
+  #       if(!placed) overlays.appendChild(labelNodes[layerName]);
+  #     });
+  #   }
+  # 
+  #   function syncFromLayerControl(){
+  #     var inputs = el.querySelectorAll('.leaflet-control-layers-overlays input[type=checkbox]');
+  #     inputs.forEach(function(inp){
+  #       var label = inp.parentElement;
+  #       var txt = '';
+  #       label.childNodes.forEach(function(n){ if(n.nodeType === 3) txt += n.nodeValue; });
+  #       var name = norm(txt);
+  #       if(name && legends[name] !== undefined){
+  #         showByLayer(name, inp.checked);
+  #       }
+  #     });
+  #   }
+  # 
+  #   // Hide all legends initially
+  #   Object.keys(legends).forEach(function(layerName){
+  #     showByLayer(layerName, false);
+  #   });
+  # 
+  #   // Initial setup after control exists
+  #   requestAnimationFrame(function(){
+  #     requestAnimationFrame(function(){
+  #       addBaseHeadingOnce();
+  #       groupOverlaysOnce();     // <-- group only once
+  #       syncFromLayerControl();
+  #     });
+  #   });
+  # 
+  #   // Keep legends in sync
+  #   map.on('overlayadd', function(e){ showByLayer(e.name, true); });
+  #   map.on('overlayremove', function(e){ showByLayer(e.name, false); });
+  # 
+  #   // Resync legends on any layer change (no regrouping)
+  #   map.on('layeradd layerremove', function(){
+  #     addBaseHeadingOnce();
+  #     syncFromLayerControl();
+  #   });
+  # }
+  # ",
+  #   data = payload
+  # )
+
+
 
   htmlwidgets::onRender(
     "
@@ -240,7 +398,7 @@ function(el, x, legends){
 
       var hd = document.createElement('div');
       hd.className = 'base-heading';
-      hd.style.textAlign = 'center';
+      hd.style.textAlign = 'left';
       hd.style.fontWeight = '600';
       hd.style.marginBottom = '4px';
       hd.textContent = 'Background map';
@@ -275,6 +433,44 @@ function(el, x, legends){
     data = legend_map
   )
 
-# map_WMS_EDITO_legend
+map_WMS_EDITO_legend
 
 
+
+# acoustic detection data map ---------------------------------------------
+
+data <- readRDS("./data/etn_sum_seabass.rds") %>%
+  dplyr::filter(!latitude == "NaN")
+
+map_acoustic_detections <-
+  map_base %>%
+  addCircleMarkers(data = data %>% dplyr::filter(date == "2018-06-29" %>% as.Date()),
+                   lat = ~latitude,
+                   lng = ~longitude,
+                   radius = ~n_individuals,
+                   fillOpacity = 0.5,
+                   popup = ~paste0("n_detections: ", n_detections,
+                                   ", station: ", station_name,
+                                   ", n_individuals: ", n_individuals))
+
+
+# tests -------------------------------------------------------------------
+install.packages("leaflet.extras2")
+library(leaflet.extras2)
+
+m <- leaflet() %>%
+  addTiles() %>%
+  leaflet.extras2::addEasyprint()
+
+m
+
+map_base %>%
+  leaflet.extras2::addEasyprint(
+    options = leaflet.extras2::easyprintOptions(
+      title = "Export PNG",
+      spinnerBgColor = blue_light,
+      filename = "DTO-Bioflow_DUC2_map",
+      position = "topleft"
+      # other options exist; see ?easyprintOptions
+    )
+  )
